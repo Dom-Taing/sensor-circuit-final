@@ -205,9 +205,6 @@ class GameManager:
           self.score += 1
           self.completed_beats += 1  # Track completed beat
           self.pixels.set_color(0,255,0)
-        else:
-          self.pixels.set_color(255,0,0)
-          self.misses += 1
     
     # Handle flick motion (flick notes)
     isFlicked = self.accelerometer.detect_flick()
@@ -222,10 +219,6 @@ class GameManager:
           self.pixels.set_color(0,255,0)
           hit_any_flick = True
           break
-      
-      if not hit_any_flick:
-        self.pixels.set_color(255,0,0)
-        self.misses += 1
 
   def update_menu_display(self):
     # Clear any notes from previous game
