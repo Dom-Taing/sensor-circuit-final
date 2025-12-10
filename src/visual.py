@@ -19,6 +19,13 @@ class Visuals:
 
   notes = []
   difficulty_names = ["Easy", "Medium", "Hard", "Custom"]
+  
+  MAX_LINES = 5
+  lines = []
+
+  MENU_LINES = ["RHYTHM GAME"] + difficulty_names
+  GAME_OVER_LINES = ["GAME OVER", "", "Score: ", "Misses: ", "Press any button"]
+  rendering = ""
 
   def __init__(self, i2c):
     displayio.release_displays()
@@ -32,6 +39,7 @@ class Visuals:
     self.background()
     self.note_group()
     self.ui()
+    self.text_display()
 
   def center_text(self, text_label, line_number):
     """Helper function to center text horizontally and position vertically
@@ -81,6 +89,25 @@ class Visuals:
     self.note_group = note_group
     self.root.append(note_group)
 
+  def text_display(self):
+    text = displayio.Group()
+    self.root.append(text)
+    self.text_group = text
+
+    for i in range(self.MAX_LINES):
+      line = label.Label(terminalio.FONT, text="", x=0, y=i*12)
+      text.append(line)
+  
+  def update_text(self, lines, focus_line=0):
+    first_index_show = max(0, focus_line - self.MAX_LINES + 1)
+    last_index_show = max(self.MAX_LINES - 1, focus_line)
+    for i in range(first_index_show, last_index_show + 1):
+      if i < len(lines):
+        self.text_group[i].text = lines[i]
+        self.center_text(self.text_group[i], i)
+      else:
+        self.text_group[i].text = ""
+
   def ui(self):
     # Create main UI group
     ui = displayio.Group()
@@ -88,60 +115,18 @@ class Visuals:
     self.ui_group = ui
     
     # Create all UI elements as class attributes
-    score_label = label.Label(terminalio.FONT, text="", x=0, y=6)
+    score_label = label.Label(terminalio.FONT, text="Game", x=0, y=6)
     miss_label = label.Label(terminalio.FONT, text="", x=0, y=16)
     level_label = label.Label(terminalio.FONT, text="", x=77, y=6)  # Moved left from 90 to 70
-    
-    # Menu elements
-    menu_title = label.Label(terminalio.FONT, text="RHYTHM GAME")
-    difficulty_easy = label.Label(terminalio.FONT, text="Easy")
-    difficulty_medium = label.Label(terminalio.FONT, text="Medium")
-    difficulty_hard = label.Label(terminalio.FONT, text="Hard")
-    difficulty_custom = label.Label(terminalio.FONT, text="Custom")
-    
-    # Game over elements
-    gameover_title = label.Label(terminalio.FONT, text="")
-    gameover_result = label.Label(terminalio.FONT, text="")
-    gameover_final_score = label.Label(terminalio.FONT, text="")
-    gameover_final_misses = label.Label(terminalio.FONT, text="")
-    gameover_restart = label.Label(terminalio.FONT, text="")
-    
-    # Position menu elements
-    self.center_text(menu_title, 0)
-    self.center_text(difficulty_easy, 1)
-    self.center_text(difficulty_medium, 2)
-    self.center_text(difficulty_hard, 3)
-    self.center_text(difficulty_custom, 4)
-    
-    # Position game over elements
-    self.center_text(gameover_title, 0)
-    self.center_text(gameover_result, 1)
-    self.center_text(gameover_final_score, 2)
-    self.center_text(gameover_final_misses, 3)
-    self.center_text(gameover_restart, 4)
-    
-    # Add all elements to UI group
-    ui.append(score_label)
-    ui.append(miss_label)
-    ui.append(level_label)
-    ui.append(menu_title)
-    ui.append(difficulty_easy)
-    ui.append(difficulty_medium)
-    ui.append(difficulty_hard)
-    ui.append(difficulty_custom)
-    ui.append(gameover_title)
-    ui.append(gameover_result)
-    ui.append(gameover_final_score)
-    ui.append(gameover_final_misses)
-    ui.append(gameover_restart)
     
     # Store as class attributes
     self.score_label = score_label
     self.miss_label = miss_label
     self.level_label = level_label
-    self.menu_title = menu_title
-    self.difficulty_options = [difficulty_easy, difficulty_medium, difficulty_hard, difficulty_custom]
-    self.gameover_elements = [gameover_title, gameover_result, gameover_final_score, gameover_final_misses, gameover_restart]
+
+    ui.append(score_label)
+    ui.append(miss_label)
+    ui.append(level_label)
 
   # function to spawn a note in a given lane (only spawn at the top of the screen)
   def spawn_note_in_lane(self, lane, note_type="tap"):
@@ -244,76 +229,39 @@ class Visuals:
       self.NOTE_H = 6
     print(f"Difficulty set to {self.difficulty_names[difficulty_index]}, Note height: {self.NOTE_H}px")
 
+  def clear(self):
+    self.ui_group.hidden = True
+    self.bg_tile.hidden = True
+    self.text_group.hidden = True
+
   def show_menu(self, difficulty_index=0):
     # Hide game elements
-    self.score_label.text = ""
-    self.miss_label.text = ""
-    self.level_label.text = ""
-    self.bg_tile.hidden = True
+    if (self.rendering != "menu"):
+      self.rendering = "menu"
+      self.clear()
+      self.text_group.hidden = False
     
-    # Hide game over elements
-    for element in self.gameover_elements:
-      element.hidden = True
-    
-    # Show menu elements
-    self.menu_title.hidden = False
-    for option in self.difficulty_options:
-      option.hidden = False
-    
-    # Highlight selected difficulty and re-center text
-    for i, option in enumerate(self.difficulty_options):
-      if i == difficulty_index:
-        option.text = "> " + self.difficulty_names[i] + " <"
-      else:
-        option.text = self.difficulty_names[i]
-      # Re-center the text after updating it
-      self.center_text(option, i + 1)
+    text = self.MENU_LINES.copy()
+    text[difficulty_index + 1] = "> " + text[(difficulty_index % self.MAX_LINES) + 1] + " <"
+    self.update_text(text, difficulty_index)
 
   def show_game(self):
-    # Hide menu elements
-    self.menu_title.hidden = True
-    for option in self.difficulty_options:
-      option.hidden = True
-    
-    # Hide game over elements
-    for element in self.gameover_elements:
-      element.hidden = True
-    
-    # Show background lanes/hit line
-    self.bg_tile.hidden = False
+    if (self.rendering != "game"):
+      self.rendering = "game"
+      self.clear()
+      self.bg_tile.hidden = False
+      self.ui_group.hidden = False
     
     # Score/miss labels will be updated by update_ui() calls
   
   def show_gameover(self, game_result, final_score, final_misses):
-    # Hide game elements
-    self.score_label.text = ""
-    self.miss_label.text = ""
-    self.level_label.text = ""
-    self.bg_tile.hidden = True
-    
-    # Hide menu elements
-    self.menu_title.hidden = True
-    for option in self.difficulty_options:
-      option.hidden = True
-    
-    # Show and update game over elements
-    for element in self.gameover_elements:
-      element.hidden = False
-    
-    # Update game over text
-    self.gameover_elements[0].text = "GAME OVER"
+    if (self.rendering != "gameover"):
+      self.rendering = "gameover"
+      self.clear()
+      self.text_group.hidden = False
+    text = ["GAME OVER", "", f"Score: {final_score}", f"Misses: {final_misses}", "Press any button"]
     if game_result == "win":
-      self.gameover_elements[1].text = "YOU WIN!"
+      text[1] = "YOU WIN!"
     else:
-      self.gameover_elements[1].text = "YOU LOSE!"
-    
-    self.gameover_elements[2].text = f"Score: {final_score}"
-    self.gameover_elements[3].text = f"Misses: {final_misses}"
-    self.gameover_elements[4].text = "Press any button"
-    
-    # Re-center text after updating
-    self.center_text(self.gameover_elements[0], 0)
-    self.center_text(self.gameover_elements[1], 1)
-    self.center_text(self.gameover_elements[2], 2)
-    self.center_text(self.gameover_elements[3], 3)
-    self.center_text(self.gameover_elements[4], 4)
+      text[1] = "YOU LOSE!"
+    self.update_text(text)
