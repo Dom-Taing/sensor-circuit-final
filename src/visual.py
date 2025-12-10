@@ -18,7 +18,7 @@ class Visuals:
   SPEED = 1.5 
 
   notes = []
-  difficulty_names = ["Easy", "Medium", "Hard", "Custom"]
+  difficulty_names = ["Easy", "Medium", "Hard", "Custom", "High Scores"]
   
   MAX_LINES = 5
   lines = []
@@ -103,10 +103,10 @@ class Visuals:
     last_index_show = max(self.MAX_LINES - 1, focus_line)
     for i in range(first_index_show, last_index_show + 1):
       if i < len(lines):
-        self.text_group[i].text = lines[i]
-        self.center_text(self.text_group[i], i)
+        self.text_group[i - first_index_show].text = lines[i]
+        self.center_text(self.text_group[i - first_index_show], i - first_index_show)
       else:
-        self.text_group[i].text = ""
+        self.text_group[i - first_index_show].text = ""
 
   def ui(self):
     # Create main UI group
@@ -243,7 +243,7 @@ class Visuals:
     
     text = self.MENU_LINES.copy()
     text[difficulty_index + 1] = "> " + text[(difficulty_index % self.MAX_LINES) + 1] + " <"
-    self.update_text(text, difficulty_index)
+    self.update_text(text, difficulty_index + 1)
 
   def show_game(self):
     if (self.rendering != "game"):
@@ -264,4 +264,27 @@ class Visuals:
       text[1] = "YOU WIN!"
     else:
       text[1] = "YOU LOSE!"
+    self.update_text(text)
+
+  def show_high_scores(self, high_scores):
+    if (self.rendering != "high scores"):
+      self.rendering = "high scores"
+      self.clear()
+      self.text_group.hidden = False
+    text = ["HIGH SCORES", ""]
+    for i, score_entry in enumerate(high_scores):
+      initials = score_entry["initials"]
+      score = score_entry["score"]
+      misses = score_entry["misses"]
+      text.append(f"{i+1}. {initials} - {score} ({misses} misses)")
+    if len(high_scores) == 0:
+      text.append("No high scores yet.")
+    self.update_text(text)
+  
+  def show_save_score(self, score, misses, initials="AAA"):
+    if (self.rendering != "save score"):
+      self.rendering = "save score"
+      self.clear()
+      self.text_group.hidden = False
+    text = ["NEW HIGH SCORE!", "", f"Score: {score} Misses: {misses}", "Enter Initials:", initials]
     self.update_text(text)

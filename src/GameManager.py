@@ -2,6 +2,7 @@ import time
 import board
 import digitalio
 from audio import AudioPlayer
+from high_score import HighScoreManager
 from visual import Visuals
 from rotary_encoder import RotaryEncoder 
 from neo_pixel import NeoPixel
@@ -14,6 +15,10 @@ class GameManager:
     i2c = board.I2C() 
     self.visual = Visuals(i2c)
     self.accelerometer = Accelerometer(i2c)
+    self.high_score_manager = HighScoreManager()
+
+    self.high_score_list = self.high_score_manager.get_top_scores()
+    self.initials = "AAA"
     
     # set up buttons
     pins = [board.D2, board.D3, board.D8, board.D9]
@@ -52,12 +57,12 @@ class GameManager:
     self.completed_beats = 0  # Track beats that have been hit or missed
 
     # Game states
-    self.state = "menu"  # can be: "menu", "playing", "gameover", "loading"
+    self.state = "menu"  # can be: "menu", "playing", "gameover", "loading", "high scores"
     self.game_result = None  # "win" or "lose"
     
     # Menu state variables
     self.difficulty = 0  # 0=easy, 1=medium, 2=hard, 3=custom
-    self.difficulties = ["Easy", "Medium", "Hard", "Custom"]
+    self.difficulties = ["Easy", "Medium", "Hard", "Custom", "High Scores"]
 
     self.song_start = 0
 
@@ -175,6 +180,10 @@ class GameManager:
         self.handle_playing_input(clicked, now)
       elif self.state == "gameover":
         self.handle_gameover_input(clicked)
+      elif self.state == "high scores":
+        self.handle_high_scores_input(clicked)
+      elif self.state == "save scores":
+        self.handle_save_scores_input(clicked) # DOM-TODO: handle save scores input
       
       self.last_input_update = now
       
@@ -185,6 +194,10 @@ class GameManager:
         self.update_game_display(now)
       elif self.state == "gameover":
         self.update_gameover_display()
+      elif self.state == "high scores":
+        self.update_high_scores_display()  # Same as gameover for now DOM-TODO: update high scores
+      elif self.state == "save scores":
+        self.handle_save_scores_display() # DOM-TODO: update high scores
       
       self.visual_update = now
 
@@ -192,7 +205,10 @@ class GameManager:
     # Any button: Start game
     for i, was_clicked in enumerate(clicked):
       if was_clicked:
-        self.start_game(track=1)
+        if (self.difficulty == len(self.difficulties) - 1):  # High Scores selected
+          self.state = "high scores"
+        else:
+          self.start_game(track=1)
         break  # Only need to start once even if multiple buttons pressed
 
   def handle_playing_input(self, clicked, now):
@@ -260,7 +276,10 @@ class GameManager:
     # Check for lose condition (more than 10 misses)
     if self.misses > 10:
       self.game_result = "lose"
-      self.state = "gameover"
+      if (self.high_score_manager.is_high_score(self.score, self.misses)):
+        self.state = "save scores"
+      else : 
+        self.state = "gameover"
       print(f"Game Over - You Lose! Misses: {self.misses}")
       return
     
@@ -268,6 +287,8 @@ class GameManager:
     if self.completed_beats >= len(self.beat_map):
       self.game_result = "win"
       self.state = "gameover"
+      self.high_score_manager.add_score(self.score, self.misses)
+      self.high_score_list = self.high_score_manager.get_top_scores()
       print(f"Game Over - You Win! Score: {self.score}, Misses: {self.misses}")
       return
     
@@ -300,3 +321,47 @@ class GameManager:
     # Show game over screen with results
     self.visual.show_gameover(self.game_result, self.score, self.misses)
 
+  def update_high_scores_display(self):
+    # Clear any remaining notes
+    self.visual.notes.clear()
+    for child in self.visual.note_group:
+      self.visual.note_group.remove(child)
+    
+    high_scores_list = self.high_score_list
+    # Show game over screen with results
+    self.visual.show_high_scores(high_scores_list)
+
+  def handle_high_scores_input(self, clicked):
+    # Any button: Return to menu
+    for i, was_clicked in enumerate(clicked):
+      if was_clicked:
+        self.state = "menu"
+        print("Returning to menu...")
+        break
+
+  def handle_save_scores_input(self, clicked):
+    # Any button: Return to menu
+    if clicked[3]:
+      self.high_score_manager.add_score(self.initials, self.score, self.misses)
+      self.high_score_list = self.high_score_manager.get_top_scores()
+      self.state = "menu"
+      return 
+    else:
+      for i, was_clicked in enumerate(clicked):
+        if was_clicked:
+          initial = self.initials[i]
+          # Cycle through A-Z
+          if initial == 'Z':
+            new_initial = 'A'
+          else:
+            new_initial = chr(ord(initial) + 1)
+          self.initials = self.initials[:i] + new_initial + self.initials[i+1:]
+          break
+  
+  def handle_save_scores_display(self):
+    # Clear any remaining notes
+    self.visual.notes.clear()
+    for child in self.visual.note_group:
+      self.visual.note_group.remove(child)
+    # Show game over screen with results
+    self.visual.show_save_score(self.score, self.misses, self.initials)
