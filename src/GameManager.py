@@ -285,10 +285,11 @@ class GameManager:
     
     # Check for win condition (all beats completed)
     if self.completed_beats >= len(self.beat_map):
-      self.game_result = "win"
-      self.state = "gameover"
-      self.high_score_manager.add_score(self.score, self.misses)
-      self.high_score_list = self.high_score_manager.get_top_scores()
+      if (self.high_score_manager.is_high_score(self.score, self.misses)):
+        self.state = "save scores"
+      else : 
+        self.state = "gameover"
+      print(f"Game Over - You Lose! Misses: {self.misses}")
       print(f"Game Over - You Win! Score: {self.score}, Misses: {self.misses}")
       return
     
